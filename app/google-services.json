@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "401202928606",
+    "project_id": "expense-tracker-dfaa3",
+    "storage_bucket": "expense-tracker-dfaa3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:401202928606:android:49b45134676f31a16a5b4f",
+        "android_client_info": {
+          "package_name": "com.example.myapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWVYqpj0N828C3sZDiWbAyUFllg-lqypw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
