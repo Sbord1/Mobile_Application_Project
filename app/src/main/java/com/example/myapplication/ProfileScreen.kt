@@ -81,7 +81,7 @@ fun ProfileScreen(navController: NavController) {
                 ProfileMenuOption(icon = R.drawable.ic_profile, label = "Account info",onClick={})
                 ProfileMenuOption(icon = R.drawable.ic_settings, label = "Settings",onClick={})
                 ProfileMenuOption(icon = R.drawable.ic_wallet, label = "Add Credit",onClick={})
-                ProfileMenuOption(icon = R.drawable.ic_logout, label = "Logout", isDestructive = true,onClick={navController.navigate("login_screen")})
+                ProfileMenuOption(icon = R.drawable.ic_logout, label = "Logout", isDestructive = true,onClick={navController.navigate("login")})
             }
         }
     }

@@ -23,179 +23,198 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.KeyboardType
 import java.text.SimpleDateFormat
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddExpenseScreen(navController: NavController) {
     var selectedCategory by remember { mutableStateOf("Entertainment") }
-    var amount by remember { mutableStateOf(TextFieldValue("$48.00")) }
+    var amount by remember { mutableStateOf(TextFieldValue("$0.00")) }
     var selectedDate by remember { mutableStateOf("Tue, 22 Feb 2022") }
-
     var expanded by remember { mutableStateOf(false) }
     var showDatePickerDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        topBar = { AddExpenseTopBar() },
-        bottomBar = { BottomNavigationBar(navController) },
-        modifier = Modifier.fillMaxSize()
+        bottomBar = { BottomNavigationBar(navController) }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color.White)
-                .offset(y = (-50).dp)
-                .zIndex(1f)
         ) {
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            // Curved background
+            Image(
+                painter = painterResource(id = R.drawable.ic_tophome),
+                contentDescription = "Top Background",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+                    .height(200.dp),
+                contentScale = ContentScale.FillBounds
+            )
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = 16.dp)
             ) {
-                Column(
+                // Title
+                Text(
+                    text = "Add Expense",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = Color.White,
                     modifier = Modifier
+                        .padding(vertical = 24.dp)
+                        .align(Alignment.CenterHorizontally)
+                )
+
+                // Main Card
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                    modifier = Modifier
+                        .padding(horizontal = 16.dp)
                         .fillMaxWidth()
-                        .padding(16.dp)
                 ) {
-                    Text(
-                        text = "Category",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                        color = Color.Black
-                    )
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White, RoundedCornerShape(8.dp))
-                            .clickable { expanded = !expanded }
-                            .padding(12.dp)
+                            .padding(16.dp)
                     ) {
+                        // Category
                         Text(
-                            text = selectedCategory,
-                            style = MaterialTheme.typography.bodyLarge,
+                            text = "Category",
+                            style = MaterialTheme.typography.titleMedium,
                             color = Color.Black
                         )
-                        DropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                                .background(Color.White, RoundedCornerShape(8.dp))
+                                .clickable { expanded = !expanded }
+                                .padding(16.dp)
                         ) {
-                            listOf("Entertainment", "Food", "Transport", "Others").forEach { category ->
-                                DropdownMenuItem(
-                                    text = { Text(category) },
-                                    onClick = {
-                                        selectedCategory = category
-                                        expanded = false
-                                    }
-                                )
+                            Text(text = selectedCategory)
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
+                                listOf("Entertainment", "Food", "Transport", "Others").forEach { category ->
+                                    DropdownMenuItem(
+                                        text = { Text(category) },
+                                        onClick = {
+                                            selectedCategory = category
+                                            expanded = false
+                                        }
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
 
-                    Text(
-                        text = "Amount",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = amount,
-                        onValueChange = { amount = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = TextFieldDefaults.outlinedTextFieldColors(
-                            containerColor = Color.White
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Date",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.White, RoundedCornerShape(8.dp))
-                            .clickable { showDatePickerDialog = true }
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                        // Amount
                         Text(
-                            text = selectedDate,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = Color.Black
+                            text = "Amount",
+                            style = MaterialTheme.typography.titleMedium
                         )
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = "Calendar Icon",
-                            modifier = Modifier.size(24.dp)
+                        OutlinedTextField(
+                            value = amount,
+                            onValueChange = { newValue ->
+                                // Ensure the value is numeric or has a valid decimal format
+                                val regex = Regex("^\\$?\\d*\\.?\\d{0,2}$") // Matches valid numeric values
+                                if (regex.matches(newValue.text) || newValue.text.isEmpty()) {
+                                    amount = newValue
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 5.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions.Default.copy(
+                                keyboardType = KeyboardType.Number // Restrict keyboard to numbers
+                            )
                         )
-                    }
 
-                    if (showDatePickerDialog) {
-                        DatePickerDialog(
-                            onDateSelected = { selectedDate = it },
-                            onDismissRequest = { showDatePickerDialog = false }
-                        )
-                    }
 
-                    Spacer(modifier = Modifier.height(16.dp))
 
-                    Button(
-                        onClick = { /* Handle Add */ },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
+                        Spacer(modifier = Modifier.height(5.dp))
+
+                        // Date
                         Text(
-                            text = "Add",
-                            style = MaterialTheme.typography.labelLarge
+                            text = "Date",
+                            style = MaterialTheme.typography.titleMedium
                         )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 5.dp)
+                                .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
+                                .clickable { showDatePickerDialog = true }
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = selectedDate)
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = "Calendar"
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(5.dp))
+
+                        // Add Button
+                        Button(
+                            onClick = { /* Handle Add */ },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2B796B)
+                            )
+                        ) {
+                            Text("Add")
+                        }
                     }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Or text
+                Text(
+                    text = "Or",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+
+                Spacer(modifier = Modifier.height(5.dp))
+
+                // Scan Receipt button
+                Button(
+                    onClick = { navController.navigate("scan_receipt") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .padding(horizontal = 16.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF2B796B)
+                    )
+                ) {
+                    Text("Scan A Receipt")
                 }
             }
 
-            Spacer(modifier = Modifier.weight(2f))
-
-            Text(
-                text = "Or",
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(vertical = 2.dp)
-                    .offset(y = (-50).dp)
-                    .zIndex(2f)
-            )
-
-            Button(
-                onClick = { navController.navigate("scan_receipt") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .padding(horizontal = 16.dp)
-                    .offset(y = (-50).dp)
-                    .zIndex(2f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = "Scan A Receipt",
-                    style = MaterialTheme.typography.labelLarge
+            if (showDatePickerDialog) {
+                DatePickerDialog(
+                    onDateSelected = { selectedDate = it },
+                    onDismissRequest = { showDatePickerDialog = false }
                 )
             }
-
         }
     }
 }

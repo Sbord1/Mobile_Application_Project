@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import android.Manifest
+import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -29,13 +30,28 @@ import androidx.navigation.compose.rememberNavController
 import com.example.myapplication.ui.theme.MyApplicationTheme // Import the theme
 import androidx.compose.material.*
 import android.content.Intent
-import android.widget.Toast
+import android.net.Uri
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.ActivityResult
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageCapture.Builder
+import androidx.camera.core.ImageProxy
+import androidx.camera.core.ImageCapture.OnImageCapturedCallback
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import android.os.Environment
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import android.widget.Toast
+
 
 
 @Suppress("NAME_SHADOWING")
@@ -44,6 +60,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var googleSignInClient: GoogleSignInClient
     private lateinit var auth: FirebaseAuth
     private lateinit var googleSignInLauncher: ActivityResultLauncher<Intent>
+    private var imageCapture: ImageCapture? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -103,7 +120,7 @@ class MainActivity : ComponentActivity() {
 
 
     @Composable
-    fun ScanReceiptScreen(navController: NavController) {
+    fun ScanReceiptScreen(navController: androidx.navigation.NavController) {
         var isCameraPermissionGranted by remember { mutableStateOf(false) }
 
         val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -113,17 +130,14 @@ class MainActivity : ComponentActivity() {
             }
         )
 
+        // Request camera permission on first launch
         LaunchedEffect(Unit) {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             Log.d("ScanReceiptScreen", "Camera permission requested")
         }
 
         Scaffold(
-            topBar = {
-                androidx.compose.material.TopAppBar(
-                    title = { Text("Scan Receipt") }
-                )
-            }
+            topBar = { androidx.compose.material.TopAppBar(title = { Text("Scan Receipt") }) }
         ) { innerPadding ->
             Box(
                 modifier = Modifier
@@ -133,18 +147,15 @@ class MainActivity : ComponentActivity() {
             ) {
                 if (isCameraPermissionGranted) {
                     Log.d("ScanReceiptScreen", "Camera permission granted")
-                    CameraPreviewView(
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    CameraPreviewView(modifier = Modifier.fillMaxSize())
 
-                    Column(
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Button(
+                        onClick = { captureImage(navController) },
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(16.dp)
                     ) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { navController.navigate("home_screen") }) {
-                            Text("Go back")
-                        }
+                        Text("Capture Image")
                     }
                 } else {
                     Text("Camera Permission Not Granted")
@@ -153,32 +164,33 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
-
     @Composable
     fun CameraPreviewView(modifier: Modifier = Modifier) {
         val context = LocalContext.current
-        val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-
+        val lifecycleOwner = LocalLifecycleOwner.current
         val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
-        // Mutable states to manage preview and error
-        var preview by remember { mutableStateOf<Preview?>(null) }
         var previewView by remember { mutableStateOf<PreviewView?>(null) }
         var error by remember { mutableStateOf<String?>(null) }
 
         LaunchedEffect(cameraProviderFuture) {
             try {
                 val cameraProvider = cameraProviderFuture.get()
-                // Unbind any previous use cases
                 cameraProvider.unbindAll()
 
-                // Create a new Preview use case
-                preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView?.surfaceProvider) }
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(previewView?.surfaceProvider)
+                }
 
-                // Bind the Preview use case to the camera
+                imageCapture = ImageCapture.Builder().build() // Initialize ImageCapture
+
                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-                cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
+                cameraProvider.bindToLifecycle(
+                    lifecycleOwner,
+                    cameraSelector,
+                    preview,
+                    imageCapture
+                )
 
                 Log.d("CameraPreviewView", "Camera preview initialized successfully")
             } catch (exc: Exception) {
@@ -187,25 +199,105 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Render the PreviewView or error message
         if (error != null) {
             Box(
                 modifier = modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = error ?: "Unknown error", color = MaterialTheme.colors.error
-                )
+                Text(text = error ?: "Unknown error", color = MaterialTheme.colors.error)
             }
         } else {
             AndroidView(
                 factory = { ctx ->
                     PreviewView(ctx).apply {
-                        previewView = this // Set the mutable state to this PreviewView
-                        Log.d("CameraPreviewView", "Surface provider set successfully")
+                        previewView = this
                     }
                 },
                 modifier = modifier
             )
         }
+    }
+
+    private fun uploadImage(imageFile: File, navController: NavController) {
+        val requestFile = RequestBody.create("image/jpeg".toMediaTypeOrNull(), imageFile)
+        val body = MultipartBody.Part.createFormData("file", imageFile.name, requestFile)
+
+        val client = OkHttpClient()
+        val request = Request.Builder()
+            .url("https://platinum-tract-449212-d7.ew.r.appspot.com//api/ocr")
+            .post(MultipartBody.Builder().setType(MultipartBody.FORM).addPart(body).build())
+            .build()
+
+        client.newCall(request).enqueue(object : Callback {
+            override fun onResponse(call: Call, response: Response) {
+                if (response.isSuccessful) {
+                    // Handle the OCR result (Extracted text)
+                    val extractedText = response.body?.string()
+                    runOnUiThread {
+                        Toast.makeText(
+                            applicationContext,
+                            "Extracted text: $extractedText",
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                        navController.navigate("add_expense")
+                    }
+                } else {
+                    // Handle the error
+                    runOnUiThread {
+                        Toast.makeText(
+                            applicationContext,
+                            "Error uploading image",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+
+            override fun onFailure(call: Call, e: IOException) {
+                runOnUiThread {
+                    Toast.makeText(
+                        applicationContext,
+                        "Failed to connect to server",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        })
+    }
+
+    private fun captureImage(navController: NavController) {
+        val imageCapture = imageCapture ?: return
+
+        // Create time-stamped name and MediaStore entry.
+        val outputFile = File(
+            getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+            "receipt_${System.currentTimeMillis()}.jpg"
+        )
+
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(outputFile).build()
+
+        imageCapture.takePicture(
+            outputOptions,
+            ContextCompat.getMainExecutor(this),
+            object : ImageCapture.OnImageSavedCallback {
+                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                    val savedUri = output.savedUri ?: Uri.fromFile(outputFile)
+                    Log.d("CaptureImage", "Photo capture succeeded: $savedUri")
+
+                    // Upload the captured image
+                    uploadImage(outputFile, navController)
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    Log.e("CaptureImage", "Photo capture failed: ${exception.message}", exception)
+                    Toast.makeText(
+                        baseContext,
+                        "Failed to capture image: ${exception.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        )
     }
 }

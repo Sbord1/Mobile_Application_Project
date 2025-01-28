@@ -99,4 +99,11 @@ dependencies {
 
     // For Animation
     implementation("com.airbnb.android:lottie-compose:6.0.0")
+
+    // Retrofit dependencies for making network requests
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+
+    // OkHttp for network logging
+    implementation("com.squareup.okhttp3:logging-interceptor:4.9.1")
 }
