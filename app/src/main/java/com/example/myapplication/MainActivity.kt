@@ -87,6 +87,9 @@ class MainActivity : ComponentActivity() {
             // ScanReceiptScreen
             composable("scan_receipt") { ScanReceiptScreen(navController) }
 
+            // AddExpenseScreen
+            composable("add_expense") { AddExpenseScreen(navController) }
+
             // Transactions Screen (Placeholder)
             composable("transactions_screen") { AllTransactionsScreen(navController) }
 
