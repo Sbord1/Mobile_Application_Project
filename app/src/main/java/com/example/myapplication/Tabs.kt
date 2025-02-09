@@ -1,50 +1,56 @@
 package com.example.myapplication
 
+import android.app.DatePickerDialog
+import android.widget.DatePicker
+import android.content.Context
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.Tab
-import androidx.compose.material.TabRow
-import androidx.compose.material.Text
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Surface
+import androidx.compose.material.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import java.util.*
 
 @Composable
-fun TransactionFilterTabs() {
-    val tabItems = listOf("Today", "Week", "Month", "Year")
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+fun TransactionFilterSelector(
+    context: Context,
+    selectedDate: Long?,
+    onDateSelected: (Long?) -> Unit
+) {
+    var selectedDateText by remember { mutableStateOf("Select Date") }
+    val calendar = Calendar.getInstance()
 
-    TabRow(
-        selectedTabIndex = selectedTabIndex,
-        backgroundColor = Color.Transparent, // Make TabRow transparent
-        contentColor = Color.Black,
-        indicator = {}, // Remove indicator for cleaner look
-        divider = {} // Remove default divider for a cleaner look
+    fun showDatePicker() {
+        val datePickerDialog = DatePickerDialog(
+            context,
+            { _: DatePicker, year: Int, month: Int, day: Int ->
+                calendar.set(Calendar.YEAR, year)
+                calendar.set(Calendar.MONTH, month)
+                calendar.set(Calendar.DAY_OF_MONTH, day)
+                val timestamp = calendar.timeInMillis
+                selectedDateText = "$day/${month + 1}/$year"
+                onDateSelected(timestamp) // Store timestamp in milliseconds
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        )
+        datePickerDialog.show()
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
     ) {
-        tabItems.forEachIndexed { index, text ->
-            Tab(
-                selected = selectedTabIndex == index,
-                onClick = { selectedTabIndex = index },
-                text = {
-                    Text(
-                        text,
-                        fontSize = 12.sp,
-                        color = if (selectedTabIndex == index) Color.White else Color.Black
-                    )
-                },
-                modifier = Modifier
-                    .padding(horizontal = 4.dp) // Space between tabs
-                    .background(
-                        if (selectedTabIndex == index) Color(0xFF00A89D) else Color(0xFFF2F3F2),
-                        shape = RoundedCornerShape(16.dp) // Rounded corners for each tab
-                    )
-                    .padding(horizontal = 1.dp, vertical = 4.dp) // Adjust spacing inside tabs
-                    .height(32.dp) // Set a fixed height for compact tabs
-            )
+        Button(onClick = { showDatePicker() }) {
+            Text(text = selectedDateText)
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Button(onClick = { onDateSelected(null); selectedDateText = "Select Date" }) {
+            Text(text = "Reset")
         }
     }
 }

@@ -38,7 +38,7 @@ fun BottomNavigationBar(navController: NavController) {
         FloatingActionButton(
             onClick = {
                 // Navigate to ScanReceiptScreen
-                navController.navigate("add_expense")
+                navController.navigate("add_expense/Others")
             },
             backgroundColor = Color(0xFF7E57C2), // Use a color that fits your theme
             modifier = Modifier

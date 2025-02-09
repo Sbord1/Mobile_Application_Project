@@ -1,7 +1,9 @@
+@file:Suppress("DEPRECATION")
 package com.example.myapplication
 
 import android.Manifest
 import android.content.Context
+import androidx.compose.runtime.LaunchedEffect
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -31,17 +33,11 @@ import com.example.myapplication.ui.theme.MyApplicationTheme // Import the theme
 import androidx.compose.material.*
 import android.content.Intent
 import android.net.Uri
-import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.GoogleAuthProvider
 import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.ActivityResult
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.ImageCapture.Builder
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.ImageCapture.OnImageCapturedCallback
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -51,6 +47,21 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import android.widget.Toast
+import com.google.firebase.FirebaseApp
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONException
+import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.android.gms.tasks.Task
+import com.google.firebase.auth.GoogleAuthProvider
 
 
 
@@ -66,6 +77,25 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        auth = FirebaseAuth.getInstance()
+
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken("401202928606-8k84hbsm8lbapohc7vqbr13lclnqf79f.apps.googleusercontent.com")
+            .requestEmail()
+            .build()
+
+        googleSignInClient = GoogleSignIn.getClient(this, gso)
+
+
+        // Initialize Firestore
+        FirebaseApp.initializeApp(this)
+        val firestore = FirebaseFirestore.getInstance()
+        val settings = FirebaseFirestoreSettings.Builder()
+            .build()
+
+        firestore.firestoreSettings = settings
+
+        Log.d("FirestoreInit", "Firestore has been initialized with offline support.")
 
         // Initialize the executor
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -86,6 +116,15 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun ExpenseTrackerApp() {
         val navController = rememberNavController()
+        val context = LocalContext.current
+        val selectedLanguage = remember { mutableStateOf(getSavedLanguage(context)) }
+
+        val googleSignInLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            handleSignInResult(task, navController)
+        }
 
         NavHost(navController = navController, startDestination = "splash") {
 
@@ -96,7 +135,7 @@ class MainActivity : ComponentActivity() {
             composable("signup") { SignUpScreen(navController) }
 
             // SignUp Page
-            composable("login") { LoginScreen(navController) }
+            composable("login") { LoginScreen(navController,googleSignInLauncher = googleSignInLauncher) }
 
             // HomeScreen
             composable("home_screen") { HomeScreen(navController) }
@@ -105,7 +144,10 @@ class MainActivity : ComponentActivity() {
             composable("scan_receipt") { ScanReceiptScreen(navController) }
 
             // AddExpenseScreen
-            composable("add_expense") { AddExpenseScreen(navController) }
+            composable("add_expense/{category}") { backStackEntry ->
+                val category = backStackEntry.arguments?.getString("category") ?: "Unknown"
+                AddExpenseScreen(navController, category)
+            }
 
             // Transactions Screen (Placeholder)
             composable("transactions_screen") { AllTransactionsScreen(navController) }
@@ -130,6 +172,17 @@ class MainActivity : ComponentActivity() {
             }
         )
 
+        // File picker launcher
+        val context = LocalContext.current
+        val filePickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri: Uri? ->
+            uri?.let {
+                val file = uriToFile(context, it) // Convert Uri to File
+                file?.let { uploadImage(it, navController) }
+            }
+        }
+
         // Request camera permission on first launch
         LaunchedEffect(Unit) {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -149,13 +202,23 @@ class MainActivity : ComponentActivity() {
                     Log.d("ScanReceiptScreen", "Camera permission granted")
                     CameraPreviewView(modifier = Modifier.fillMaxSize())
 
-                    Button(
-                        onClick = { captureImage(navController) },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(16.dp)
+                    Column(
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Capture Image")
+                        Button(
+                            onClick = { captureImage(navController) },
+                            modifier = Modifier.padding(8.dp)
+                        ) {
+                            Text("Capture Image")
+                        }
+
+                        Button(
+                            onClick = { filePickerLauncher.launch("image/*") },
+                            modifier = Modifier.padding(8.dp)
+                        ) {
+                            Text("Choose from Gallery")
+                        }
                     }
                 } else {
                     Text("Camera Permission Not Granted")
@@ -224,47 +287,46 @@ class MainActivity : ComponentActivity() {
 
         val client = OkHttpClient()
         val request = Request.Builder()
-            .url("https://platinum-tract-449212-d7.ew.r.appspot.com//api/ocr")
+            .url("https://platinum-tract-449212-d7.ew.r.appspot.com/api/ocr")
             .post(MultipartBody.Builder().setType(MultipartBody.FORM).addPart(body).build())
             .build()
 
         client.newCall(request).enqueue(object : Callback {
             override fun onResponse(call: Call, response: Response) {
                 if (response.isSuccessful) {
-                    // Handle the OCR result (Extracted text)
-                    val extractedText = response.body?.string()
-                    runOnUiThread {
-                        Toast.makeText(
-                            applicationContext,
-                            "Extracted text: $extractedText",
-                            Toast.LENGTH_LONG
-                        ).show()
+                    val responseBody = response.body?.string()
+                    Log.d("UploadImage", "OCR Extracted text: $responseBody")
 
-                        navController.navigate("add_expense")
+                    // Extract only the "extracted_text" field from JSON response
+                    val extractedText = try {
+                        JSONObject(responseBody).getString("extracted_text")
+                    } catch (e: JSONException) {
+                        Log.e("UploadImage", "Failed to parse OCR response", e)
+                        null
+                    }
+
+                    // Send extracted text to categorization API
+                    extractedText?.let {
+                        Log.d("UploadImage", "Sending extracted text to categorization API: $it")
+                        categorizeReceipt(it, navController)
+                    } ?: runOnUiThread {
+                        Toast.makeText(applicationContext, "Error extracting text", Toast.LENGTH_SHORT).show()
                     }
                 } else {
-                    // Handle the error
                     runOnUiThread {
-                        Toast.makeText(
-                            applicationContext,
-                            "Error uploading image",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        Toast.makeText(applicationContext, "Error uploading image", Toast.LENGTH_SHORT).show()
                     }
                 }
             }
 
             override fun onFailure(call: Call, e: IOException) {
                 runOnUiThread {
-                    Toast.makeText(
-                        applicationContext,
-                        "Failed to connect to server",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(applicationContext, "Failed to connect to server", Toast.LENGTH_SHORT).show()
                 }
             }
         })
     }
+
 
     private fun captureImage(navController: NavController) {
         val imageCapture = imageCapture ?: return
@@ -300,4 +362,189 @@ class MainActivity : ComponentActivity() {
             }
         )
     }
+
+    private fun categorizeReceipt(extractedText: String, navController: NavController) {
+        val json = JSONObject().apply {
+            put("text", extractedText)
+        }
+
+        val requestBody = json.toString().toRequestBody("application/json".toMediaTypeOrNull())
+
+        val request = Request.Builder()
+            .url("https://platinum-tract-449212-d7.ew.r.appspot.com/api/categorize")
+            .post(requestBody)
+            .build()
+
+        val client = OkHttpClient()
+        client.newCall(request).enqueue(object : Callback {
+            override fun onResponse(call: Call, response: Response) {
+                if (response.isSuccessful) {
+                    val category = response.body?.string()?.let {
+                        JSONObject(it).getString("category")
+                    } ?: "Others"
+
+                    Log.d("Categorization", "Receipt categorized as: $category")
+
+                    // ✅ Add expense to Firestore before navigating
+                    saveExpenseToFirestore(category, extractedText, navController)
+                } else {
+                    Log.e("Categorization", "Failed to categorize receipt: ${response.message}")
+                    runOnUiThread {
+                        Toast.makeText(applicationContext, "Error categorizing receipt", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+
+            override fun onFailure(call: Call, e: IOException) {
+                Log.e("Categorization", "Failed to connect to categorization API", e)
+                runOnUiThread {
+                    Toast.makeText(applicationContext, "Failed to connect to server", Toast.LENGTH_SHORT).show()
+                }
+            }
+        })
+    }
+
+
+    fun uriToFile(context: Context, uri: Uri): File? {
+        val contentResolver = context.contentResolver
+        val tempFile = File.createTempFile("temp_image", ".jpg", context.cacheDir)
+
+        return try {
+            contentResolver.openInputStream(uri)?.use { inputStream ->
+                FileOutputStream(tempFile).use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+            }
+            tempFile
+        } catch (e: IOException) {
+            Log.e("UriToFile", "Failed to copy URI to file: ${e.message}")
+            null
+        }
+    }
+
+    private fun saveExpenseToFirestore(category: String, extractedText: String, navController: NavController) {
+        val auth = FirebaseAuth.getInstance()
+        val db = FirebaseFirestore.getInstance()
+        val userId = auth.currentUser?.uid
+
+        if (userId == null) {
+            Log.e("Firestore", "User not logged in")
+            return
+        }
+
+        val amount = extractAmountFromText(extractedText)  // Extracted total
+        val dateFormat = SimpleDateFormat("EEE, dd MMM yyyy", Locale.getDefault()) // Matches "gio, 30 gen 2025"
+        val date = dateFormat.format(Date())  // Formats the current date
+        val timestamp = System.currentTimeMillis() // Ensures correct timestamp
+
+        val expenseData = hashMapOf(
+            "userId" to userId,
+            "category" to category,
+            "amount" to amount,  // **Ensures amount is a Double**
+            "date" to date,  // **Stores date in localized format**
+            "timestamp" to timestamp  // **Ensures correct epoch time**
+        )
+
+        db.collection("expenses")
+            .add(expenseData)
+            .addOnSuccessListener {
+                Log.d("Firestore", "Expense added successfully!")
+
+                runOnUiThread {
+                    Toast.makeText(applicationContext, "Expense Added!", Toast.LENGTH_SHORT).show()
+
+                    // ✅ Navigate to Transactions Screen after saving
+                    Log.d("Navigation", "Navigating to transactions_screen")
+                    navController.navigate("transactions_screen") {
+                        popUpTo("transactions_screen") { inclusive = true }
+                    }
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("Firestore", "Error adding expense", e)
+                runOnUiThread {
+                    Toast.makeText(applicationContext, "Failed to save expense", Toast.LENGTH_SHORT).show()
+                }
+            }
+    }
+
+
+    private fun extractAmountFromText(text: String): Double {
+        val totalKeywords = listOf(
+            "TOTALE", "TOTALE EURO", "TOTALE COMPLESSIVO",  // Italian
+            "TOTAL", "TOTAL AMOUNT", "TOTAL PRICE",        // English
+            "MONTANT TOTAL", "PRIX TOTAL",                 // French
+            "GESAMTBETRAG", "SUMME",                        // German
+            "TOTAL GENERAL"                                 // Spanish, Portuguese
+        )
+
+        // Regex to match amounts in formats like "69.00", "1,234.56", "1.234,56"
+        val amountRegex = Regex("(\\d{1,3}(?:[.,]\\d{3})*[.,]\\d{2})")
+
+        var bestAmount: Double? = null
+        var bestPosition = Int.MAX_VALUE
+
+        for (keyword in totalKeywords) {
+            val pattern = Regex("$keyword\\s*(\\d{1,3}(?:[.,]\\d{3})*[.,]\\d{2})?", RegexOption.IGNORE_CASE)
+            val match = pattern.find(text)
+
+            if (match != null) {
+                val keywordPosition = match.range.first
+
+                // Check number AFTER the keyword
+                match.groups[1]?.value?.let {
+                    val amount = it.replace(",", ".").toDoubleOrNull()
+                    if (amount != null) return amount  // Prioritize direct match
+                }
+
+                // If no number after, search the closest number BEFORE the keyword
+                amountRegex.findAll(text).forEach { numberMatch ->
+                    val numberPosition = numberMatch.range.first
+                    val amount = numberMatch.value.replace(",", ".").toDoubleOrNull()
+
+                    if (amount != null && numberPosition < keywordPosition && numberPosition < bestPosition) {
+                        bestAmount = amount
+                        bestPosition = numberPosition
+                    }
+                }
+            }
+        }
+
+        // If no keyword match, fallback to last valid amount in the receipt
+        if (bestAmount == null) {
+            val lastAmountMatch = amountRegex.findAll(text).lastOrNull()?.value?.replace(",", ".")
+            bestAmount = lastAmountMatch?.toDoubleOrNull()
+        }
+
+        return bestAmount ?: 0.0
+    }
+
+    private fun handleSignInResult(task: Task<GoogleSignInAccount>, navController: NavController) {
+        try {
+            val account = task.getResult(ApiException::class.java)
+            firebaseAuthWithGoogle(account.idToken!!, navController)
+        } catch (e: ApiException) {
+            Log.w("GoogleSignIn", "Google sign in failed", e)
+        }
+    }
+
+
+
+    private fun firebaseAuthWithGoogle(idToken: String, navController: NavController) {
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        auth.signInWithCredential(credential)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    Toast.makeText(this, "Login Successful", Toast.LENGTH_SHORT).show()
+                    navController.navigate("home_screen")
+                } else {
+                    Toast.makeText(this, "Login Failed", Toast.LENGTH_SHORT).show()
+                }
+            }
+    }
+
+
+
+
+
 }

@@ -62,7 +62,8 @@ dependencies {
     implementation("androidx.compose.foundation:foundation:1.5.1") // Compose Foundation
     implementation("androidx.compose.runtime:runtime:1.5.1") // Runtime
     implementation("androidx.compose.ui:ui-tooling-preview:1.5.1")
-    implementation(libs.androidx.appcompat) // Preview support
+    implementation(libs.androidx.appcompat)
+    implementation(libs.firebase.firestore.ktx) // Preview support
     debugImplementation("androidx.compose.ui:ui-tooling:1.5.1") // Tooling for debug
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.5.1") // Test manifest
 
@@ -85,7 +86,7 @@ dependencies {
     implementation("com.google.firebase:firebase-database") // Firebase Realtime Database
     implementation("com.google.firebase:firebase-analytics") // Firebase Analytics
     implementation("com.google.android.gms:play-services-location:21.3.0")
-    implementation("com.google.android.gms:play-services-auth:21.3.0") // Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:20.5.0") // Google Sign-In
 
 
     // Testing
@@ -106,4 +107,5 @@ dependencies {
 
     // OkHttp for network logging
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.1")
+    implementation("com.android.volley:volley:1.2.1")
 }

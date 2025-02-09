@@ -1,5 +1,7 @@
+@file:Suppress("DEPRECATION")
 package com.example.myapplication
 
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -19,18 +21,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
+import androidx.activity.result.ActivityResultLauncher
 
 
 @Composable
-fun LoginScreen(navController: NavController) {
-    var username by remember { mutableStateOf("") }
+fun LoginScreen(navController: NavController, googleSignInLauncher: ActivityResultLauncher<Intent>) {
+    var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val auth = FirebaseAuth.getInstance()
+    val context = LocalContext.current
 
     Scaffold(
         topBar = { LoginTopBar() }
@@ -53,10 +59,10 @@ fun LoginScreen(navController: NavController) {
                 modifier = Modifier.padding(bottom = 10.dp)
             )
 
-            // Username Field
+            // Email Field
             OutlinedTextField(
-                value = username,
-                onValueChange = { username = it },
+                value = email,
+                onValueChange = { email = it },
                 label = { Text("Email") },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -93,35 +99,72 @@ fun LoginScreen(navController: NavController) {
                 )
             )
 
-            // Get Started Button
-            Button(
-                onClick = {
-                    // Attempt to sign in with Firebase Authentication
-                    if (username.isNotEmpty() && password.isNotEmpty()) {
-                        signInUser(username, password, navController)
-                    } else {
-                        Toast.makeText(
-                            navController.context,
-                            "Please enter both email and password.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                },
+            // Log in buttons
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-                    .height(48.dp),
-                shape = RoundedCornerShape(12.dp), // Rounded corners
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp) // Space between buttons
             ) {
-                Text(
-                    text = "Log in",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White,
-                    fontSize = 14.sp, // Text size
-                )
+
+                // Log In Button
+                Button(
+                    onClick = {
+                        if (email.isNotEmpty() && password.isNotEmpty()) {
+                            signInUser(email, password, navController, context)
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "Please enter both email and password.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text(
+                        text = "Log in",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                }
+
+                // Google Sign-In Button
+                Button(
+                    onClick = {
+                        val signInIntent = GoogleSignIn.getClient(
+                            context,
+                            GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                .requestIdToken("401202928606-8k84hbsm8lbapohc7vqbr13lclnqf79f.apps.googleusercontent.com")
+                                .requestEmail()
+                                .build()
+                        ).signInIntent
+
+                        googleSignInLauncher.launch(signInIntent)
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White
+                    )
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.google),
+                        contentDescription = "Google Icon",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Google", color = Color.Black)
+                }
             }
 
 
@@ -157,18 +200,18 @@ fun LoginScreen(navController: NavController) {
     }
 }
 
-fun signInUser(username: String, password: String, navController: NavController) {
+fun signInUser(email: String, password: String, navController: NavController, context: Context) {
     val auth = FirebaseAuth.getInstance()
 
-    auth.signInWithEmailAndPassword(username, password)
+    auth.signInWithEmailAndPassword(email, password)
         .addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 // User is logged in, navigate to home screen
-                Toast.makeText(navController.context, "Login successful", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Login successful", Toast.LENGTH_SHORT).show()
                 navController.navigate("home_screen")
             } else {
                 // If login fails, show an error message
-                Toast.makeText(navController.context, "Login failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Login failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
             }
         }
 }
@@ -190,13 +233,4 @@ fun LoginTopBar() {
             contentScale = ContentScale.Crop // Adjust this to match your design
         )
     }
-}
-
-// Preview function
-@Preview(showBackground = true)
-@Composable
-fun LoginScreenPreview() {
-    // Use a mock NavController for the preview
-    val navController = rememberNavController()
-    LoginScreen(navController = navController)
 }
