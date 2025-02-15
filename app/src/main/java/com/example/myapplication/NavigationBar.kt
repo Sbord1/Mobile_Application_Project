@@ -22,7 +22,7 @@ import androidx.navigation.compose.rememberNavController
 @Composable
 fun BottomNavigationBar(navController: NavController) {
     Box {
-        // Background Image (Custom Bottom Bar Design)
+        // Background Image
         Image(
             painter = painterResource(id = R.drawable.ic_navigation_bar),
             contentDescription = "Custom Bottom Navigation Bar",
@@ -34,13 +34,13 @@ fun BottomNavigationBar(navController: NavController) {
         )
 
 
-        // Floating Action Button (FAB)
+        // Floating Action Button
         FloatingActionButton(
             onClick = {
                 // Navigate to ScanReceiptScreen
-                navController.navigate("scan_receipt")
+                navController.navigate("add_expense/Others")
             },
-            backgroundColor = Color(0xFF7E57C2), // Use a color that fits your theme
+            backgroundColor = Color(0xFF7E57C2),
             modifier = Modifier
                 .align(Alignment.BottomCenter) // Place at the bottom center
                 .offset(y = (-15).dp)
@@ -54,7 +54,7 @@ fun BottomNavigationBar(navController: NavController) {
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 5.dp) // Adjust padding to fit the design
+                .padding(bottom = 5.dp)
         ) {
             // Home
             BottomNavigationItem(
@@ -65,7 +65,7 @@ fun BottomNavigationBar(navController: NavController) {
             )
 
             // Spacer to add custom spacing
-            Spacer(modifier = Modifier.width(0.dp)) // Add space between items
+            Spacer(modifier = Modifier.width(0.dp))
 
             // Transactions
             BottomNavigationItem(
@@ -76,8 +76,8 @@ fun BottomNavigationBar(navController: NavController) {
                 modifier = Modifier.offset(x = (-15).dp)
             )
 
-            // Spacer to add custom spacing
-            Spacer(modifier = Modifier.width(30.dp)) // Add extra space for FAB
+
+            Spacer(modifier = Modifier.width(30.dp))
 
             // Statistics
             BottomNavigationItem(
@@ -88,8 +88,8 @@ fun BottomNavigationBar(navController: NavController) {
                 modifier = Modifier.offset(x = (15).dp)
             )
 
-            // Spacer to add custom spacing
-            Spacer(modifier = Modifier.width(0.dp)) // Add space between items
+
+            Spacer(modifier = Modifier.width(0.dp))
 
             // Profile
             BottomNavigationItem(

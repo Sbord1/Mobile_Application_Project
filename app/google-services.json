@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "401202928606",
+    "firebase_url": "https://expense-tracker-dfaa3-default-rtdb.europe-west1.firebasedatabase.app",
     "project_id": "expense-tracker-dfaa3",
     "storage_bucket": "expense-tracker-dfaa3.firebasestorage.app"
   },
@@ -12,7 +13,20 @@
           "package_name": "com.example.myapplication"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "401202928606-pfnso447hjs3flf0jb71k2a2ga6ufp50.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.myapplication",
+            "certificate_hash": "9a1d25ee1d0b0f64d155701e1d36ac6915716060"
+          }
+        },
+        {
+          "client_id": "401202928606-8k84hbsm8lbapohc7vqbr13lclnqf79f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBWVYqpj0N828C3sZDiWbAyUFllg-lqypw"
@@ -20,7 +34,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "401202928606-8k84hbsm8lbapohc7vqbr13lclnqf79f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

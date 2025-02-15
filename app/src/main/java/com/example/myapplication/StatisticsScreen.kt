@@ -1,17 +1,17 @@
 package com.example.myapplication
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,104 +21,206 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalContext
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import co.yml.charts.ui.piechart.models.PieChartData
+import java.util.Calendar
+import android.content.Context
+import android.os.Environment
+import java.io.File
+import java.io.FileWriter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
 
 @Composable
 fun StatisticsScreen(navController: NavController) {
-    val scrollState = rememberScrollState()
-    var chartType by remember { mutableStateOf("Line Chart") }
+    val db = FirebaseFirestore.getInstance()
+    val auth = FirebaseAuth.getInstance()
+    val context = LocalContext.current
+
+    var chartType by remember { mutableStateOf("Pie Chart") }
+    var selectedYear by remember { mutableStateOf(Calendar.getInstance().get(Calendar.YEAR)) }
+    var categoryTotals by remember { mutableStateOf(mapOf<String, Double>()) }
+    val chartTypes = listOf("Line Chart", "Pie Chart", "Bar Chart")
+
+    // 🎨 **Color Palette for Categories**
+    val colors = listOf(
+        Color(0xFF333333), Color(0xFF666a86), Color(0xFF95B8D1),
+        Color(0xFFF53844), Color(0xFF3C91E6), Color(0xFFFFA07A)
+    )
+
+    var categoryColorMap by remember { mutableStateOf(mapOf<String, Color>()) }
 
     Scaffold(
-        topBar = { CustomTopBar() },
+        topBar = { CustomTopBar(categoryTotals) },
         bottomBar = { BottomNavigationBar(navController) }
-    ) {
-        Column(
+    ) { padding ->
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(it)
-                .verticalScroll(scrollState)
+                .padding(padding)
         ) {
-            Spacer(modifier = Modifier.height(10.dp))
+            item {
+                Spacer(modifier = Modifier.height(10.dp))
 
-            TransactionFilterTabs()
+                //  Chart Type Selector
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    var expanded by remember { mutableStateOf(false) }
 
-            Spacer(modifier = Modifier.height(10.dp))
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = { expanded = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Text(text = chartType)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = "Dropdown")
+                        }
 
-            // Dropdown Button Below Filter Tabs
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.End
-            ) {
-                ChartTypeSelector(
-                    onChartTypeSelected = { selectedType ->
-                        chartType = selectedType
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false }
+                        ) {
+                            chartTypes.forEach { type ->
+                                DropdownMenuItem(onClick = {
+                                    chartType = type
+                                    expanded = false
+                                }) {
+                                    Text(text = type)
+                                }
+                            }
+                        }
                     }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Chart Section - No Box, directly use the chart composable
-            when (chartType) {
-                "Line Chart" -> LineChartScreen()
-                "Pie Chart" -> PieChartScreen()
-                "Bar Chart" -> BarChartScreen()
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Spending Categories
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                listOf(
-                    "Shopping" to "-5120",
-                    "Subscription" to "-1280",
-                    "Food" to "-532"
-                ).forEach { (category, amount) ->
-                    SpendingCategoryCard(category = category, amount = amount)
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                YearSelector(selectedYear) { newYear ->
+                    selectedYear = newYear
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Fetch Transactions When Dates Are Selected
+                LaunchedEffect(selectedYear) {
+                    val user = auth.currentUser
+                    if (user == null) {
+                        Toast.makeText(context, "User not authenticated", Toast.LENGTH_SHORT).show()
+                        return@LaunchedEffect
+                    }
+
+                    val userId = user.uid
+
+                    db.collection("expenses")
+                        .whereEqualTo("userId", userId)
+                        .get()
+                        .addOnSuccessListener { snapshot ->
+                            val totals = mutableMapOf<String, Double>()
+                            snapshot.documents.forEach { document ->
+                                val amount = document.getDouble("amount") ?: 0.0
+                                val category = document.getString("category") ?: "Other"
+                                val date = document.getString("date") ?: ""
+
+                                // Extract year from date string
+                                val year = date.split(" ").lastOrNull()?.toIntOrNull()
+                                if (year == selectedYear) {
+                                    totals[category] = (totals[category] ?: 0.0) + amount
+                                }
+                            }
+
+                            // Assign consistent colors to categories
+                            val sortedCategories = totals.keys.sorted()  // Sort for consistency
+                            val colorMap = sortedCategories.mapIndexed { index, category ->
+                                category to colors[index % colors.size]
+                            }.toMap()
+
+                            categoryTotals = totals
+                            categoryColorMap = colorMap
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(
+                                context,
+                                "Error fetching transactions: ${e.message}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(10.dp))
+                val totalAmount = categoryTotals.values.sum().toFloat()
+
+                val pieSlices = categoryTotals.entries.mapIndexed { index, entry ->
+                    PieChartData.Slice(
+                        label = entry.key,
+                        value = if (totalAmount > 0) (entry.value.toFloat() / totalAmount) * 100 else 0f,
+                        color = colors[index % colors.size]
+                    )
+                }
+
+                // Chart Section
+                when (chartType) {
+                    "Line Chart" -> LineChartScreen(selectedYear)
+                    "Pie Chart" -> PieChartScreen(selectedYear, pieSlices)
+                    "Bar Chart" -> BarChartScreen(
+                        selectedYear = selectedYear,
+                        colors = categoryColorMap
+                    )
+
+
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+
+
+            items(categoryTotals.entries.toList()) { entry ->
+                val category = entry.key
+                val total = entry.value
+                val index = categoryTotals.keys.indexOf(category)
+                SpendingCategoryCard(
+                    category = category,
+                    amount = String.format("%.2f", total),
+                    color = colors[index % colors.size]
+                )
             }
         }
     }
 }
 
-
 @Composable
-fun CustomTopBar() {
+fun CustomTopBar(categoryTotals: Map<String, Double>) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.White) // Optional background color
+            .background(Color.White)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-            // Centered Text
-            Text(
-                text = "Statistics",
-                style = MaterialTheme.typography.h5, // Larger text for emphasis
-                color = Color.Black,
-                modifier = Modifier
-                    .padding(bottom = 30.dp)
-                    .padding(top = 30.dp)
-                    .padding(horizontal = 100.dp)
-
-            )
-            // Download Button
-                IconButton(
-                    onClick = { /* Handle download action */ }
-                ) {
-                    DownloadButton()
-                }
+        Text(
+            text = "Statistics",
+            style = MaterialTheme.typography.h5,
+            color = Color.Black,
+            modifier = Modifier
+                .padding(bottom = 30.dp)
+                .padding(top = 30.dp)
+                .padding(horizontal = 100.dp)
+        )
+        val context = LocalContext.current
+        IconButton(onClick = { exportToCSV(categoryTotals, context) }) {
+            DownloadButton()
         }
     }
-
+}
 
 @Composable
 fun DownloadButton(modifier: Modifier = Modifier) {
@@ -130,98 +232,82 @@ fun DownloadButton(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun SpendingCategoryCard(category: String, amount: String) {
+fun SpendingCategoryCard(category: String, amount: String, color: Color) {
     Card(
-        shape = RoundedCornerShape(16.dp), // Rounded corners
-        backgroundColor = Color.White, // Background color
-        elevation = 4.dp, // Elevation for shadow
+        shape = RoundedCornerShape(16.dp),
+        backgroundColor = Color.White,
+        elevation = 4.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp) // Space between cards
+            .padding(vertical = 8.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp), // Padding inside the card
+                .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Category Name
-            Text(
-                text = category,
-                style = MaterialTheme.typography.body1
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Color Dot
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .background(color, shape = CircleShape)
+                )
 
-            // Amount with Error Color for Negative Values
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = category,
+                    style = MaterialTheme.typography.body1
+                )
+            }
+
             Text(
-                text = amount,
+                text = "€$amount",
                 style = MaterialTheme.typography.body1,
-                color = MaterialTheme.colors.error,
+                color = if (amount.toDoubleOrNull() ?: 0.0 < 0) MaterialTheme.colors.error else Color.Red,
                 fontWeight = FontWeight.Bold
             )
         }
     }
 }
 
+fun exportToCSV(expenses: Map<String, Double>, context: Context) {
+    try {
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.getDefault())
+        val currentDate = dateFormat.format(Date())
+        val fileName = "Expenses_$currentDate.csv"
 
 
-@Composable
-fun ChartTypeSelector(
-    onChartTypeSelected: (String) -> Unit // Callback for when a chart type is selected
-) {
-    var expanded by remember { mutableStateOf(false) } // Track dropdown state
-    var selectedChartType by remember { mutableStateOf("Line Chart") }
-
-    Box(
-        modifier = Modifier
-            .wrapContentSize(Alignment.TopEnd) // Align dropdown at the top-right
-    ) {
-        // Button to trigger the dropdown
-        OutlinedButton(
-            onClick = { expanded = !expanded },
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.height(40.dp)
-        ) {
-            Text(text = selectedChartType, color = Color.Black)
-            Spacer(modifier = Modifier.width(4.dp))
-            Icon(
-                imageVector = Icons.Default.ArrowDropDown,
-                contentDescription = "Dropdown Icon",
-                tint = Color.Black
-            )
+        val downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        if (downloadsDir?.exists() == false) {
+            downloadsDir.mkdirs() // Create the directory if it doesn't exist
         }
 
-        // Dropdown menu for chart type selection
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .background(Color.White) // Optional: background for the dropdown
-        ) {
-            val chartTypes = listOf("Line Chart", "Pie Chart", "Bar Chart")
-            chartTypes.forEach { chartType ->
-                DropdownMenuItem(
-                    onClick = {
-                        selectedChartType = chartType // Update selected chart type
-                        expanded = false // Close dropdown
-                        onChartTypeSelected(chartType) // Notify parent of selection
-                    }
-                ) {
-                    Text(text = chartType, color=Color.Black)
-                }
-            }
+        val file = File(downloadsDir, fileName)
+        val writer = FileWriter(file)
+
+        // CSV Headers
+        writer.append("Category,Amount (€)\n")
+
+        // Write expense data
+        expenses.forEach { (category, amount) ->
+            writer.append("$category,${"%.2f".format(amount)}\n")
         }
+
+        writer.flush()
+        writer.close()
+
+        Toast.makeText(context, "CSV Exported: ${file.absolutePath}", Toast.LENGTH_LONG).show()
+    } catch (e: Exception) {
+        Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
     }
 }
 
 
-
-
-@Preview(
-    showBackground = true,
-    device = "spec:width=360dp,height=780dp,dpi=408",
-    showSystemUi = true
-)
+@Preview(showBackground = true)
 @Composable
 fun PreviewStatistics() {
     val dummyNavController = rememberNavController()

@@ -1,5 +1,6 @@
 package com.example.myapplication
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.Text
@@ -19,75 +20,371 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.rememberNavController
 import androidx.compose.material.Card
 import androidx.compose.ui.layout.ContentScale
-
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.ui.text.style.TextAlign
+import androidx.navigation.NavController
+import com.google.firebase.firestore.Query
+import android.widget.Toast
+import androidx.compose.material.OutlinedButton
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.android.volley.Request
+import com.android.volley.toolbox.JsonObjectRequest
+import com.android.volley.toolbox.Volley
+import android.content.Context
+import org.json.JSONObject
+import androidx.compose.material.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.*
+import kotlinx.coroutines.launch
+import androidx.compose.material.DismissDirection
+import androidx.compose.material.DismissValue
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.SwipeToDismiss
+import androidx.compose.material.rememberDismissState
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 
 @Composable
-fun AllTransactionsScreen(navController: androidx.navigation.NavController) {
-    val transactions = listOf(
-        Transaction("Upwork", "Today", "+ $850.00", Color.Green),
-        Transaction("Transfer", "Yesterday", "- $85.00", Color.Red),
-        Transaction("Paypal", "Jan 30, 2022", "+ $1,406.00", Color.Green),
-        Transaction("Youtube", "Jan 16, 2022", "- $11.99", Color.Red),
-        Transaction("Upwork", "Today", "+ $850.00", Color.Green),
-        Transaction("Upwork", "Today", "+ $850.00", Color.Green),
-        Transaction("Upwork", "Today", "+ $850.00", Color.Green),
+fun AllTransactionsScreen(navController: NavController) {
+    val transactions = remember { mutableStateListOf<Transaction>() }
+    val db = FirebaseFirestore.getInstance()
+    val auth = FirebaseAuth.getInstance()
+    val context = LocalContext.current
 
-    )
+    var startDate by remember { mutableStateOf<Long?>(null) }
+    var endDate by remember { mutableStateOf<Long?>(null) }
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+    var selectedCurrency by remember { mutableStateOf("EUR") } // Currency selector state
+    var expanded by remember { mutableStateOf(false) }
+    val availableCurrencies = listOf("EUR", "USD", "GBP", "JPY", "CHF")
+    var isLoading by remember { mutableStateOf(false) } // Loading State
+
+
+    fun deleteTransaction(transaction: Transaction) {
+        db.collection("expenses")
+            .document(transaction.id)
+            .delete()
+            .addOnSuccessListener {
+                transaction.isVisible.value = false //  Hide the transaction
+                Toast.makeText(context, "Transaction deleted", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener {
+                Toast.makeText(context, "Error deleting transaction", Toast.LENGTH_SHORT).show()
+            }
+    }
 
     Scaffold(
-        topBar = { TransactionTopBar() },
-        bottomBar = {
-            BottomNavigationBar(navController)
+        topBar = { TransactionTopBar(
+            navController = navController,
+            selectedCurrency = selectedCurrency,
+            onCurrencyChange = { newCurrency ->
+                selectedCurrency = newCurrency
+            },
+            startDate = startDate,
+            endDate = endDate
+        )
         },
-
+        bottomBar = { BottomNavigationBar(navController) }
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
-                .padding (bottom=20.dp)// Adjust padding to avoid overlapping the bottom bar
-                .padding(horizontal = 5.dp) // Add padding for overall content
-                .padding (vertical=25.dp)
-                .offset(y = (-40).dp) // Adjust vertical offset to reduce extra space
+                .fillMaxSize()
+                .padding(padding)
         ) {
-            items(transactions) { transaction ->
-                FullTransactionItem(transaction)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                OutlinedButton(
+                    onClick = { showStartDatePicker = true },
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = startDate?.let { formatDate(it) } ?: "Start Date",
+                        maxLines = 1
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                OutlinedButton(
+                    onClick = { showEndDatePicker = true },
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = endDate?.let { formatDate(it) } ?: "End Date",
+                        maxLines = 1
+                    )
+                }
+
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    availableCurrencies.forEach { currency ->
+                        DropdownMenuItem(onClick = {
+                            expanded = false
+                            isLoading = true
+                            transactions.clear()
+
+                            convertAllTransactions(
+                                context,
+                                transactions,
+                                selectedCurrency,
+                                currency,
+                                onStart = { transactions.clear() },
+                                onComplete = {
+                                    selectedCurrency = currency
+                                    isLoading = false
+                                }
+                            )
+                        }) {
+                            Text(text = currency)
+                        }
+                    }
+                }
+            }
+
+            if (showStartDatePicker) {
+                DatePickerDialog(
+                    context = context,
+                    onDateSelected = { date -> startDate = date },
+                    onDismissRequest = { showStartDatePicker = false }
+                )
+            }
+
+            if (showEndDatePicker) {
+                DatePickerDialog(
+                    context = context,
+                    onDateSelected = { date -> endDate = date },
+                    onDismissRequest = { showEndDatePicker = false }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Show Loading Indicator
+            if (isLoading) {
+                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+            }
+
+            // Fetch Transactions & Convert on Currency Change
+            LaunchedEffect(startDate, endDate, selectedCurrency) {
+                val user = auth.currentUser
+                if (user == null) {
+                    Toast.makeText(context, "User not authenticated", Toast.LENGTH_SHORT).show()
+                    return@LaunchedEffect
+                }
+
+                isLoading = true
+
+                val userId = user.uid
+                var query = db.collection("expenses").whereEqualTo("userId", userId)
+
+                if (startDate != null) query = query.whereGreaterThanOrEqualTo("timestamp", startDate!!)
+                if (endDate != null) query = query.whereLessThanOrEqualTo("timestamp", endDate!!)
+
+                query.orderBy("timestamp", Query.Direction.DESCENDING)
+                    .get()
+                    .addOnSuccessListener { snapshot ->
+                        transactions.clear()
+                        snapshot.documents.forEach { document ->
+                            val baseAmount = document.getDouble("amount") ?: 0.0
+                            val category = document.getString("category") ?: "Unknown"
+                            val date = document.getString("date") ?: "Unknown"
+
+                            val transaction = Transaction(
+                                id = document.id,
+                                title = category,
+                                date = date,
+                                baseAmount = baseAmount,
+                                amount = mutableStateOf(baseAmount),
+                                color = Color.Red
+                            )
+
+                            if (selectedCurrency != "EUR") {
+                                convertAmount(context, baseAmount, "EUR", selectedCurrency) { convertedAmount ->
+                                    transaction.amount.value = convertedAmount
+                                }
+                            }
+                            transactions.add(transaction)
+                        }
+                        isLoading = false
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(context, "Error fetching transactions", Toast.LENGTH_SHORT).show()
+                        isLoading = false
+                    }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Show Transactions
+            if (transactions.isEmpty() && !isLoading) {
+                Text(
+                    text = "No transactions found",
+                    style = MaterialTheme.typography.h6,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 5.dp)
+                ) {
+                    items(transactions) { transaction ->
+                        FullTransactionItem(
+                            transaction = transaction,
+                            selectedCurrency = selectedCurrency,
+                            onDelete = { deleteTransaction(it) }
+                        )
+                    }
+                }
             }
         }
     }
 }
 
+
+
+
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
-fun FullTransactionItem(transaction: Transaction) {
-    Card(
-        shape = RoundedCornerShape(16.dp), // Rounded corners for each item
-        backgroundColor = Color.White, // Background color for the card
-        elevation = 4.dp, // Elevation for shadow effect
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp) // Add space between items
+fun FullTransactionItem(
+    transaction: Transaction,
+    selectedCurrency: String,
+    onDelete: (Transaction) -> Unit //  Callback for deleting
+) {
+
+    val dismissState = rememberDismissState(
+        confirmStateChange = {
+            if (it == DismissValue.DismissedToEnd || it == DismissValue.DismissedToStart) {
+                onDelete(transaction) //  Trigger delete callback
+                true
+            } else {
+                false
+            }
+        }
+    )
+
+    AnimatedVisibility(
+        visible = transaction.isVisible.value,
+        enter = fadeIn(),
+        exit = fadeOut()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp), // Padding inside each card
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text(transaction.title, fontWeight = FontWeight.Bold)
-                Text(transaction.date, color = Color.Gray)
+        SwipeToDismiss(
+            state = dismissState,
+            directions = setOf(DismissDirection.EndToStart), //Swipe Left
+            background = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete",
+                        tint = Color.Gray
+                    )
+                }
+            },
+            dismissContent = {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    backgroundColor = Color.White,
+                    elevation = 4.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(transaction.title, fontWeight = FontWeight.Bold)
+                            Text(transaction.date, color = Color.Gray)
+                        }
+                        Text(
+                            text = String.format(
+                                "%.2f %s",
+                                transaction.amount.value,
+                                selectedCurrency
+                            ),
+                            color = transaction.color,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
-            Text(transaction.amount, color = transaction.color, fontWeight = FontWeight.Bold)
-        }
+        )
     }
 }
 
+fun convertAllTransactions(
+    context: Context,
+    transactions: MutableList<Transaction>,
+    fromCurrency: String,
+    toCurrency: String,
+    onStart: () -> Unit,
+    onComplete: () -> Unit
+) {
+    if (fromCurrency == toCurrency) {
+        onComplete()
+        return
+    }
+
+    onStart()  // Clear transactions & trigger loading
+
+    val conversionTasks = transactions.map { transaction ->
+        kotlinx.coroutines.CompletableDeferred<Unit>().apply {
+            convertAmount(context, transaction.baseAmount, fromCurrency, toCurrency) { convertedAmount ->
+                transaction.amount.value = convertedAmount
+                complete(Unit)
+            }
+        }
+    }
+
+    kotlinx.coroutines.GlobalScope.launch {
+        conversionTasks.forEach { it.await() }
+        onComplete()
+    }
+}
+
+
+
 @Composable
-fun TransactionTopBar() {
+fun TransactionTopBar(
+    navController: NavController,
+    selectedCurrency: String,
+    onCurrencyChange: (String) -> Unit,
+    startDate: Long? = null,
+    endDate: Long? = null
+) {
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp)
-            .offset(y = (-25).dp)
+            .height(230.dp)
 
     ) {
         // Background Image
@@ -97,35 +394,66 @@ fun TransactionTopBar() {
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.FillBounds
         )
-        // Overlaying Content (Text + Filtering Tabs)
+
+        // Overlaying Content (Title)
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 16.dp), // Padding to prevent overlap with the top edge
+                .padding(top = 16.dp),
             verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally // Center items vertically within the Box
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Centered Text
+            // Centered Title
             Text(
                 text = "Transactions",
-                style = MaterialTheme.typography.h4, // Larger text for emphasis
+                style = MaterialTheme.typography.h4,
                 color = Color.White,
-                modifier = Modifier
-                    .padding(bottom = 15.dp)
+                modifier = Modifier.padding(bottom = 10.dp)
             )
-            TransactionFilterTabs()
 
+            BalanceCard(
+                navController,
+                selectedCurrency,
+                onCurrencyChange = onCurrencyChange,
+                startDate = startDate,
+                endDate = endDate
+            )
         }
     }
 }
 
-@Preview(
-    showBackground = true,
-    device = "spec:width=360dp,height=780dp,dpi=408", // Approximate dimensions for Huawei P20 Pro
-    showSystemUi = true // Shows the status and navigation bars in preview
-)
-@Composable
-fun PreviewTransaction() {
-    val dummyNavController = rememberNavController()
-    AllTransactionsScreen(navController = dummyNavController)
+fun convertAmount(
+    context: Context,
+    amount: Double,
+    fromCurrency: String,
+    toCurrency: String,
+    onResult: (Double) -> Unit
+) {
+    if (fromCurrency == toCurrency) {
+        onResult(amount)
+        return
+    }
+
+    val url = "https://platinum-tract-449212-d7.ew.r.appspot.com/api/convert"
+
+    val requestBody = JSONObject().apply {
+        put("amount", amount)
+        put("from_currency", fromCurrency)
+        put("to_currency", toCurrency)
+    }
+
+    val request = JsonObjectRequest(
+        Request.Method.POST, url, requestBody,
+        { response ->
+            val convertedAmount = response.getDouble("converted_amount")
+            onResult(convertedAmount)
+        },
+        { error ->
+            Log.e("CurrencyConversion", "Error converting currency: ${error.message}")
+            onResult(amount)
+        }
+    )
+
+    Volley.newRequestQueue(context).add(request)
 }
+
