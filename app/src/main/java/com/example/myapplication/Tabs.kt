@@ -29,7 +29,7 @@ fun TransactionFilterSelector(
                 calendar.set(Calendar.DAY_OF_MONTH, day)
                 val timestamp = calendar.timeInMillis
                 selectedDateText = "$day/${month + 1}/$year"
-                onDateSelected(timestamp) // Store timestamp in milliseconds
+                onDateSelected(timestamp)
             },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),

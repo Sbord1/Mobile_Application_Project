@@ -44,178 +44,185 @@ fun AddExpenseScreen(navController: NavController, category: String) {
     val auth = FirebaseAuth.getInstance()
     val context = LocalContext.current
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Top Bar
-        AddExpenseTopBar()
+    Scaffold(
+        bottomBar = { BottomNavigationBar(navController) }
+    ) { innerPadding ->
 
-        Spacer(modifier = Modifier.height(5.dp))
-
-        // Main Content
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp)
+                .padding(innerPadding) //Avoids overlapping with Bottom Bar
         ) {
-            // Card with negative top margin to create overlap
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            // Top Bar
+            AddExpenseTopBar()
+
+            Spacer(modifier = Modifier.height(5.dp))
+
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 120.dp) // Adjust this value to control overlap
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
             ) {
-                Column(
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(top = 120.dp)
                 ) {
-                    // Category Selection
-                    Text(text = "Category", style = MaterialTheme.typography.titleMedium)
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                            .background(Color.White, RoundedCornerShape(8.dp))
-                            .clickable { expanded = !expanded }
                             .padding(16.dp)
                     ) {
-                        Text(text = selectedCategory)
-                        DropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
+                        // Category Selection
+                        Text(text = "Category", style = MaterialTheme.typography.titleMedium)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                                .background(Color.White, RoundedCornerShape(8.dp))
+                                .clickable { expanded = !expanded }
+                                .padding(16.dp)
                         ) {
-                            listOf("Entertainment", "Food", "Transport", "Others").forEach { category ->
-                                DropdownMenuItem(
-                                    text = { Text(category) },
-                                    onClick = {
-                                        selectedCategory = category
-                                        expanded = false
-                                    }
-                                )
+                            Text(text = selectedCategory)
+                            DropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
+                                listOf("Entertainment", "Food", "Transport", "Others").forEach { category ->
+                                    DropdownMenuItem(
+                                        text = { Text(category) },
+                                        onClick = {
+                                            selectedCategory = category
+                                            expanded = false
+                                        }
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
 
-                    // Amount Input
-                    Text(text = "Amount", style = MaterialTheme.typography.titleMedium)
-                    OutlinedTextField(
-                        value = amount,
-                        onValueChange = { newValue ->
-                            val regex = Regex("^\\d*\\.?\\d{0,2}$")
-                            if (regex.matches(newValue.text) || newValue.text.isEmpty()) {
-                                amount = newValue
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
-                    )
+                        // Amount Input
+                        Text(text = "Amount", style = MaterialTheme.typography.titleMedium)
+                        OutlinedTextField(
+                            value = amount,
+                            onValueChange = { newValue ->
+                                val regex = Regex("^\\d*\\.?\\d{0,2}$")
+                                if (regex.matches(newValue.text) || newValue.text.isEmpty()) {
+                                    amount = newValue
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Number)
+                        )
 
-                    Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
 
-                    // Date Selection
-                    Text(text = "Date", style = MaterialTheme.typography.titleMedium)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                            .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
-                            .clickable { showDatePickerDialog = true }
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = selectedDate)
-                        Icon(imageVector = Icons.Default.CalendarToday, contentDescription = "Calendar")
-                    }
+                        // Date Selection
+                        Text(text = "Date", style = MaterialTheme.typography.titleMedium)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                                .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
+                                .clickable { showDatePickerDialog = true }
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(text = selectedDate)
+                            Icon(imageVector = Icons.Default.CalendarToday, contentDescription = "Calendar")
+                        }
 
-                    Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
 
-                    // Add Expense Button
-                    Button(
-                        onClick = {
-                            if (amount.text.isBlank()) {
-                                Toast.makeText(context, "Please enter a valid amount", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
+                        // Add Expense Button
+                        Button(
+                            onClick = {
+                                if (amount.text.isBlank()) {
+                                    Toast.makeText(context, "Please enter a valid amount", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
 
-                            val userId = auth.currentUser?.uid
-                            if (userId == null) {
-                                Toast.makeText(context, "Please login first", Toast.LENGTH_SHORT).show()
-                                return@Button
-                            }
+                                val userId = auth.currentUser?.uid
+                                if (userId == null) {
+                                    Toast.makeText(context, "Please login first", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
 
-                            val expense = hashMapOf(
-                                "userId" to userId,
-                                "category" to selectedCategory,
-                                "amount" to (amount.text.toDoubleOrNull() ?: 0.0),
-                                "date" to selectedDate,
-                                "timestamp" to selectedDateMillis
-                            )
+                                val expense = hashMapOf(
+                                    "userId" to userId,
+                                    "category" to selectedCategory,
+                                    "amount" to (amount.text.toDoubleOrNull() ?: 0.0),
+                                    "date" to selectedDate,
+                                    "timestamp" to selectedDateMillis
+                                )
 
-                            db.collection("expenses")
-                                .add(expense)
-                                .addOnSuccessListener {
-                                    Toast.makeText(context, "Expense Added!", Toast.LENGTH_SHORT).show()
-                                    navController.navigate("transactions_screen") {
-                                        // Clear the back stack up to transactions_screen
-                                        popUpTo("transactions_screen") { inclusive = true }
+                                db.collection("expenses")
+                                    .add(expense)
+                                    .addOnSuccessListener {
+                                        Toast.makeText(context, "Expense Added!", Toast.LENGTH_SHORT).show()
+                                        navController.navigate("transactions_screen") {
+                                            popUpTo("transactions_screen") { inclusive = true }
+                                        }
                                     }
-                                }
-                                .addOnFailureListener { e ->
-                                    Toast.makeText(
-                                        context,
-                                        "Error: ${e.message}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2B796B))
-                    ) {
-                        Text("Add Expense")
-                    }
+                                    .addOnFailureListener { e ->
+                                        Toast.makeText(
+                                            context,
+                                            "Error: ${e.message}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2B796B))
+                        ) {
+                            Text("Add Expense")
+                        }
 
-                    Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
 
-                    // Or text
-                    Text(
-                        text = "Or",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    )
+                        // Or text
+                        Text(
+                            text = "Or",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
 
-                    Spacer(modifier = Modifier.height(5.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
 
-                    // Scan Receipt button
-                    Button(
-                        onClick = { navController.navigate("scan_receipt") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2B796B))
-                    ) {
-                        Text("Scan A Receipt")
+                        // Scan Receipt button
+                        Button(
+                            onClick = { navController.navigate("scan_receipt") },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2B796B))
+                        ) {
+                            Text("Scan A Receipt")
+                        }
                     }
                 }
             }
-        }
 
-        if (showDatePickerDialog) {
-            DatePickerDialog(
-                onDateSelected = { selectedDate = it },
-                onDismissRequest = { showDatePickerDialog = false }
-            )
+            if (showDatePickerDialog) {
+                DatePickerDialog(
+                    onDateSelected = { selectedDate = it },
+                    onDismissRequest = { showDatePickerDialog = false }
+                )
+            }
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -282,7 +289,7 @@ fun AddExpenseTopBar() {
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.FillBounds
         )
-        // Overlaying Content (Text)
+
         Column(
             modifier = Modifier
                 .fillMaxSize()

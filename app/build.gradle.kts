@@ -108,4 +108,11 @@ dependencies {
     // OkHttp for network logging
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.1")
     implementation("com.android.volley:volley:1.2.1")
+
+    // Cropping Image
+    implementation("com.vanniktech:android-image-cropper:4.5.0")
+    implementation("androidx.appcompat:appcompat:1.6.1")
+
+    // Preferences
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
 }

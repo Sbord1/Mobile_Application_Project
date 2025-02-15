@@ -27,15 +27,26 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import com.google.firebase.firestore.Query
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(navController: androidx.navigation.NavController) {
+    val context = LocalContext.current
     var username by remember { mutableStateOf("User") }
     var selectedCurrency by rememberSaveable { mutableStateOf("EUR") }
+    val userPreferences = remember { UserPreferences(context) }
+
+    // Read stored username from DataStore
+    val savedUsername by userPreferences.usernameFlow.collectAsState(initial = "User")
+
+    LaunchedEffect(Unit) {
+        username = savedUsername // Load from local storage immediately
+    }
 
     // Ensure Firebase authentication is initialized
     val auth = FirebaseAuth.getInstance()
@@ -45,13 +56,17 @@ fun HomeScreen(navController: androidx.navigation.NavController) {
         if (userId != null) {
             fetchUsername { fetchedUsername ->
                 username = fetchedUsername
+                // Save username locally after fetching from Firestore
+                kotlinx.coroutines.GlobalScope.launch {
+                    userPreferences.saveUsername(fetchedUsername)
+                }
             }
         }
     }
 
     Scaffold(
         topBar = { HomeAppBar(navController, username, selectedCurrency, onCurrencyChange = { newCurrency ->
-            selectedCurrency = newCurrency // 🔹 Update state in HomeScreen
+            selectedCurrency = newCurrency //  Update state
         }) },
         bottomBar = { BottomNavigationBar(navController) },
         floatingActionButtonPosition = FabPosition.Center
@@ -76,7 +91,7 @@ fun HomeAppBar(
     navController: androidx.navigation.NavController,
     username: String,
     selectedCurrency: String,
-    onCurrencyChange: (String) -> Unit // 🔹 Accept function to update currency
+    onCurrencyChange: (String) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -121,7 +136,7 @@ fun TransactionHistory(
     val context = LocalContext.current
 
     var transactions by remember { mutableStateOf<List<Transaction>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(false) }  // ✅ Loading state
+    var isLoading by remember { mutableStateOf(false) }  //  Loading state
 
     LaunchedEffect(userId, selectedCurrency) {
         if (userId == null) {
@@ -129,7 +144,7 @@ fun TransactionHistory(
             return@LaunchedEffect
         }
 
-        isLoading = true  // ✅ Start loading
+        isLoading = true  //  Start loading
 
         db.collection("expenses")
             .whereEqualTo("userId", userId)
@@ -152,31 +167,31 @@ fun TransactionHistory(
                 }
 
                 if (selectedCurrency != "EUR") {
-                    transactions = emptyList() // ✅ Clear transactions before conversion
+                    transactions = emptyList() // Clear transactions before conversion
 
-                    // ✅ Convert all transactions asynchronously
+                    //  Convert all transactions asynchronously
                     val convertedTransactions = mutableListOf<Transaction>()
                     fetchedTransactions.forEach { transaction ->
                         convertAmount(context, transaction.baseAmount, "EUR", selectedCurrency) { convertedAmount ->
                             convertedTransactions.add(transaction.copy(amount = mutableStateOf(convertedAmount)))
 
-                            // ✅ Update transactions only when all conversions are done
+                            //  Update transactions only when all conversions are done
                             if (convertedTransactions.size == fetchedTransactions.size) {
                                 transactions = convertedTransactions
-                                isLoading = false  // ✅ Stop loading after conversion
+                                isLoading = false  //  Stop loading after conversion
                             }
                         }
                     }
                 } else {
-                    // ✅ If currency is EUR, no conversion needed
+                    //  If currency is EUR, no conversion needed
                     transactions = fetchedTransactions
-                    isLoading = false  // ✅ Stop loading immediately
+                    isLoading = false  //  Stop loading immediately
                 }
             }
             .addOnFailureListener { e ->
                 Log.e("Firestore", "Error fetching transactions: ${e.message}")
                 transactions = emptyList()
-                isLoading = false  // ✅ Stop loading on failure
+                isLoading = false  //  Stop loading on failure
             }
     }
 
@@ -197,12 +212,12 @@ fun TransactionHistory(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ✅ Show loading spinner when data is being fetched or converted
+        //  Show loading spinner when data is being fetched or converted
         if (isLoading) {
             CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
         }
 
-        // ✅ Show transactions only when loading is complete
+        //  Show transactions only when loading is complete
         if (transactions.isNotEmpty() && !isLoading) {
             LazyColumn {
                 items(transactions) { transaction ->
@@ -217,7 +232,7 @@ fun TransactionHistory(
             }
         }
 
-        // ✅ Show "No transactions found" if list is empty and not loading
+        //  Show "No transactions found" if list is empty and not loading
         if (transactions.isEmpty() && !isLoading) {
             Text(
                 text = "No transactions found",

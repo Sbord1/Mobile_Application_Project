@@ -54,7 +54,7 @@ fun LoginScreen(navController: NavController, googleSignInLauncher: ActivityResu
                 text = "Welcome To Expense Tracker",
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary, // Custom green color to match the design
+                color = MaterialTheme.colorScheme.primary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = 10.dp)
             )
@@ -74,7 +74,7 @@ fun LoginScreen(navController: NavController, googleSignInLauncher: ActivityResu
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color.Black // Text color for input
+                    disabledContainerColor = Color.Black
                 )
             )
 
@@ -95,7 +95,7 @@ fun LoginScreen(navController: NavController, googleSignInLauncher: ActivityResu
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color.Black // Text color for input
+                    disabledContainerColor = Color.Black
                 )
             )
 
@@ -139,15 +139,19 @@ fun LoginScreen(navController: NavController, googleSignInLauncher: ActivityResu
                 // Google Sign-In Button
                 Button(
                     onClick = {
-                        val signInIntent = GoogleSignIn.getClient(
+                        val googleSignInClient = GoogleSignIn.getClient(
                             context,
                             GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
                                 .requestIdToken("401202928606-8k84hbsm8lbapohc7vqbr13lclnqf79f.apps.googleusercontent.com")
                                 .requestEmail()
                                 .build()
-                        ).signInIntent
+                        )
 
-                        googleSignInLauncher.launch(signInIntent)
+                        // Sign out to force account selection
+                        googleSignInClient.signOut().addOnCompleteListener {
+                            val signInIntent = googleSignInClient.signInIntent
+                            googleSignInLauncher.launch(signInIntent)
+                        }
                     },
                     modifier = Modifier
                         .weight(1f)
@@ -191,7 +195,7 @@ fun LoginScreen(navController: NavController, googleSignInLauncher: ActivityResu
                     text = annotatedString,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.clickable {
-                        // Handle click action for the "Sign Up" part
+
                         navController.navigate("signup")  // Navigates to Sign Up screen
                     }
                 )
@@ -224,13 +228,13 @@ fun LoginTopBar() {
             .fillMaxWidth()
             .height(370.dp)
     ) {
-        // Background Image (PNG)
+        // Background Image
         Image(
-            painter = painterResource(id = R.drawable.login), // Replace with your PNG file name
+            painter = painterResource(id = R.drawable.login),
             contentDescription = "Login Top Bar Background",
             modifier = Modifier
                 .fillMaxSize(),
-            contentScale = ContentScale.Crop // Adjust this to match your design
+            contentScale = ContentScale.Crop
         )
     }
 }

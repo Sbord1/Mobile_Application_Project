@@ -33,7 +33,7 @@ fun BarChartScreen(
 
     var expenses by remember { mutableStateOf<Map<String, Float>>(emptyMap()) }
 
-    // 🔥 Fetch Data Dynamically from Firebase
+    // Fetch Data Dynamically from Firebase
     LaunchedEffect(selectedYear) {
         val user = auth.currentUser
         if (user == null) {
@@ -65,7 +65,7 @@ fun BarChartScreen(
             }
     }
 
-    // **Render Bar Chart if Expenses Exist**
+    // Render Bar Chart if Expenses Exist
     if (expenses.isNotEmpty()) {
         val maxAmount = expenses.values.maxOrNull() ?: 1f
 
@@ -131,14 +131,14 @@ fun BarChartScreen(
                     val barHeight = (amount / maxAmount) * size.height
                     val color = colors[category] ?: Color.Gray
 
-                    // ✅ Draw Bar
+                    //  Draw Bar
                     drawRect(
                         color = color,
                         topLeft = Offset(xOffset, size.height - barHeight),
                         size = androidx.compose.ui.geometry.Size(barWidth, barHeight)
                     )
 
-                    // ✅ Draw Category Labels at an Angle
+                    //  Draw Category Labels at an Angle
                     drawIntoCanvas { canvas ->
                         val textPaint = android.graphics.Paint().apply {
                             textSize = 30f

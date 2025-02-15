@@ -23,7 +23,6 @@ import androidx.navigation.NavController
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import retrofit2.Call
-import java.util.Date
 
 
 @Composable
@@ -118,7 +117,7 @@ fun BalanceCard(
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     availableCurrencies.forEach { currency ->
                         DropdownMenuItem(onClick = {
-                            onCurrencyChange(currency) // 🔹 Update selected currency globally
+                            onCurrencyChange(currency) // Update selected currency globally
                             expanded = false
                         }) {
                             Text(text = currency)

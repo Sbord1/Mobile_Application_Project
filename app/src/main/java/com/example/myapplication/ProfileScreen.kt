@@ -37,13 +37,16 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import java.io.File
 import java.io.FileOutputStream
-import android.content.SharedPreferences
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageView
+import android.graphics.Bitmap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.draw.clip
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import kotlinx.coroutines.launch
+
 
 @Composable
 fun ProfileScreen(navController: NavController) {
@@ -55,16 +58,20 @@ fun ProfileScreen(navController: NavController) {
     var email by remember { mutableStateOf<String?>(null) }
     var profilePictureUri by remember { mutableStateOf<Uri?>(null) }
     var showEditDialog by remember { mutableStateOf(false) }
-    var showZoomDialog by remember { mutableStateOf(false) }  // ✅ Zoom dialog state
-    var showLanguageDialog by remember { mutableStateOf(false) }
+    var showZoomDialog by remember { mutableStateOf(false) }
+    var showAccountInfoDialog by remember { mutableStateOf(false) }
+    var accountCreationDate by remember { mutableStateOf<String?>(null) }
 
-    var selectedLanguage by remember { mutableStateOf(getSavedLanguage(context)) }
+
 
     // Fetch user data and profile picture when screen loads
     LaunchedEffect(userId) {
         fetchUserData { fetchedUsername, fetchedEmail ->
             username = fetchedUsername
             email = fetchedEmail
+        }
+        fetchAccountCreationDate { date ->
+            accountCreationDate = date
         }
         profilePictureUri = getSavedProfilePictureUri(context, userId)
     }
@@ -86,29 +93,39 @@ fun ProfileScreen(navController: NavController) {
                     .fillMaxWidth()
                     .padding(top = 150.dp)
             ) {
-                // ✅ Profile Picture (Zoom on Click)
+                //  Profile Picture (Zoom on Click)
                 Surface(
                     shape = CircleShape,
                     color = Color.LightGray,
                     modifier = Modifier
                         .size(100.dp)
-                        .clickable { showZoomDialog = true } // ✅ Opens Zoom Dialog
+                        .clickable { showZoomDialog = true } //  Opens Zoom Dialog
 
                 ) {
                     if (profilePictureUri != null) {
                         val bitmap = BitmapFactory.decodeStream(
                             context.contentResolver.openInputStream(profilePictureUri!!)
                         )
+                        val resizedBitmap = bitmap?.let {
+                            Bitmap.createScaledBitmap(it, 100, 100, true)
+                        }
+
+                        resizedBitmap?.let {
                         Image(
-                            bitmap = bitmap.asImageBitmap(),
-                            contentDescription = "Profile Picture",
-                            modifier = Modifier.fillMaxSize()
+                            bitmap = resizedBitmap.asImageBitmap(),
+                            contentDescription = "Cropped Profile Picture",
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(CircleShape)
                         )
+                        }
                     } else {
                         Image(
                             painter = painterResource(id = R.drawable.ic_launcher_foreground),
                             contentDescription = "Default Profile Picture",
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(CircleShape)
                         )
                     }
                 }
@@ -138,9 +155,8 @@ fun ProfileScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                ProfileMenuOption(icon = R.drawable.ic_profile, label = "Account info", onClick = {})
+                ProfileMenuOption(icon = R.drawable.ic_profile, label = "Account info",  onClick = { showAccountInfoDialog = true })
                 ProfileMenuOption(icon = R.drawable.ic_settings, label = "Settings", onClick = { showEditDialog = true })
-                ProfileMenuOption(icon = R.drawable.ic_wallet, label = "Change language", onClick = { showLanguageDialog = true })
                 ProfileMenuOption(icon = R.drawable.ic_logout, label = "Logout", isDestructive = true) {
                     navController.navigate("login")
                 }
@@ -148,24 +164,54 @@ fun ProfileScreen(navController: NavController) {
         }
     }
 
-    // ✅ Edit Profile Dialog
+    //  Edit Profile Dialog
     if (showEditDialog) {
         EditProfileDialog(
             currentUsername = username ?: "",
             currentProfilePictureUri = profilePictureUri,
             onDismiss = { showEditDialog = false },
             onSave = { newUsername, newProfilePictureUri ->
-                FirebaseFirestore.getInstance()
-                    .collection("users")
-                    .document(userId)
-                    .update("username", newUsername)
-                    .addOnSuccessListener {
-                        Toast.makeText(context, "✅ Username updated!", Toast.LENGTH_SHORT).show()
-                    }
-                    .addOnFailureListener {
-                        Toast.makeText(context, "❌ Failed to update username.", Toast.LENGTH_SHORT).show()
-                    }
+                val db = FirebaseFirestore.getInstance()
+                val userRef = db.collection("users").document(userId)
+                val userPreferences = UserPreferences(context)
 
+                userRef.get().addOnSuccessListener { document ->
+                    if (document.exists()) {
+                        // Update username if the document exists
+                        userRef.update("username", newUsername)
+                            .addOnSuccessListener {
+                                Toast.makeText(context, "Username updated!", Toast.LENGTH_SHORT).show()
+                                kotlinx.coroutines.GlobalScope.launch {
+                                    userPreferences.saveUsername(newUsername)
+                                }
+                            }
+                            .addOnFailureListener { e ->
+                                Toast.makeText(context, "Failed to update username: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                    } else {
+                        // Document doesn't exist, create it first
+                        val newUserData = hashMapOf(
+                            "username" to newUsername,
+                            "email" to (auth.currentUser?.email ?: "Unknown")
+                        )
+
+                        userRef.set(newUserData)
+                            .addOnSuccessListener {
+                                Toast.makeText(context, " Username saved!", Toast.LENGTH_SHORT).show()
+                                kotlinx.coroutines.GlobalScope.launch {
+                                    userPreferences.saveUsername(newUsername)
+                                }
+                            }
+                            .addOnFailureListener { e ->
+                                Toast.makeText(context, " Failed to create user document: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+
+                    }
+                }.addOnFailureListener { e ->
+                    Toast.makeText(context, "Error fetching user data: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+
+                //  Save Profile Picture if updated
                 newProfilePictureUri?.let {
                     saveProfilePictureLocally(context, it, userId)
                     profilePictureUri = it
@@ -173,24 +219,25 @@ fun ProfileScreen(navController: NavController) {
 
                 username = newUsername
             }
+
         )
     }
-
-    // ✅ Zoom Dialog for Profile Picture
-    if (showZoomDialog) {
-        ZoomedImageDialog(imageUri = profilePictureUri, onDismiss = { showZoomDialog = false })
-    }
-
-    if (showLanguageDialog) {
-        LanguageSelectionDialog(
-            selectedLanguage = selectedLanguage,
-            onDismiss = { showLanguageDialog = false },
-            onLanguageSelected = { newLanguage ->
-                saveLanguagePreference(context, newLanguage)
-                selectedLanguage = newLanguage
-                showLanguageDialog = false
+    if (showAccountInfoDialog) {
+        AlertDialog(
+            onDismissRequest = { showAccountInfoDialog = false },
+            title = { Text("Account Information") },
+            text = { Text("Your account was created on: \n${accountCreationDate ?: "Loading..."}") },
+            confirmButton = {
+                TextButton(onClick = { showAccountInfoDialog = false }) {
+                    Text("OK")
+                }
             }
         )
+    }
+
+    //  Zoom Dialog for Profile Picture
+    if (showZoomDialog) {
+        ZoomedImageDialog(imageUri = profilePictureUri, onDismiss = { showZoomDialog = false })
     }
 }
 
@@ -203,13 +250,39 @@ fun EditProfileDialog(
 ) {
     var newUsername by remember { mutableStateOf(currentUsername) }
     var newProfilePictureUri by remember { mutableStateOf(currentProfilePictureUri) }
-    val context = LocalContext.current
+    LocalContext.current
+    val cropImageLauncher = rememberLauncherForActivityResult(
+        contract = CropImageContract()
+    ) { result: CropImageView.CropResult? ->
+        if (result?.uriContent != null) {
+            newProfilePictureUri = result.uriContent
+        }
+    }
 
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { newProfilePictureUri = it }
+        uri?.let {
+            val cropOptions = CropImageContractOptions(
+                uri,
+                CropImageOptions().apply {
+                    cropShape = CropImageView.CropShape.OVAL
+                    fixAspectRatio = true
+                    aspectRatioX = 1
+                    aspectRatioY = 1
+                    guidelines = CropImageView.Guidelines.ON
+                    showCropOverlay = true
+                    toolbarColor = android.graphics.Color.BLACK
+                    scaleType = CropImageView.ScaleType.CENTER_CROP
+                }
+            )
+            cropImageLauncher.launch(cropOptions)
+        }
     }
+
+
+
+
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -335,7 +408,7 @@ fun ZoomedImageDialog(imageUri: Uri?, onDismiss: () -> Unit) {
 
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = null,          // ❌ No title needed for zoom
+            title = null,
             text = {
                 Box(
                     modifier = Modifier
@@ -423,16 +496,34 @@ fun fetchUserData(onUserDataFetched: (String, String) -> Unit) {
         }
 }
 
+fun fetchAccountCreationDate(onDateFetched: (String) -> Unit) {
+    val auth = FirebaseAuth.getInstance()
+    val user = auth.currentUser
+
+    user?.metadata?.creationTimestamp?.let { timestamp ->
+        val date = java.text.SimpleDateFormat("dd MMM yyyy HH:mm", java.util.Locale.getDefault())
+            .format(java.util.Date(timestamp))
+        onDateFetched(date)
+    } ?: onDateFetched("Unknown")
+}
+
+
 fun saveProfilePictureLocally(context: Context, uri: Uri, userId: String) {
     try {
         val inputStream = context.contentResolver.openInputStream(uri)
-        val file = File(context.filesDir, "profile_picture_$userId.jpg") // Unique filename per user
+        val bitmap = BitmapFactory.decodeStream(inputStream)
+
+        // Resize Image to 300x300 pixels
+        val resizedBitmap = Bitmap.createScaledBitmap(bitmap, 300, 300, true)
+
+        val file = File(context.filesDir, "profile_picture_$userId.jpg")
         val outputStream = FileOutputStream(file)
 
-        inputStream?.copyTo(outputStream)
+        // Compress and save as JPEG
+        resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 80, outputStream)
 
-        inputStream?.close()
         outputStream.close()
+        inputStream?.close()
     } catch (e: Exception) {
         e.printStackTrace()
     }
@@ -447,66 +538,6 @@ fun deleteProfilePicture(context: Context, userId: String) {
     val file = File(context.filesDir, "profile_picture_$userId.jpg")
     if (file.exists()) {
         file.delete()
-    }
-}
-
-fun saveLanguagePreference(context: Context, language: String) {
-    val sharedPreferences: SharedPreferences = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
-    with(sharedPreferences.edit()) {
-        putString("language", language)
-        apply()
-    }
-}
-
-fun getSavedLanguage(context: Context): String {
-    val sharedPreferences: SharedPreferences = context.getSharedPreferences("AppPrefs", Context.MODE_PRIVATE)
-    return sharedPreferences.getString("language", "en") ?: "en"  // Default to English
-}
-
-
-@Composable
-fun LanguageSelectionDialog(
-    selectedLanguage: String,
-    onDismiss: () -> Unit,
-    onLanguageSelected: (String) -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Select Language") },
-        text = {
-            Column {
-                LanguageOption("English", "en", selectedLanguage, onLanguageSelected)
-                LanguageOption("Italiano", "it", selectedLanguage, onLanguageSelected)
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Composable
-fun LanguageOption(
-    label: String,
-    languageCode: String,
-    selectedLanguage: String,
-    onLanguageSelected: (String) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onLanguageSelected(languageCode) }
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(
-            selected = selectedLanguage == languageCode,
-            onClick = { onLanguageSelected(languageCode) }
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = label)
     }
 }
 

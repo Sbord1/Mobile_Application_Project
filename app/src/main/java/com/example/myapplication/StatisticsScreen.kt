@@ -66,7 +66,7 @@ fun StatisticsScreen(navController: NavController) {
             item {
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // 🔽 **Chart Type Selector**
+                //  Chart Type Selector
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -108,7 +108,7 @@ fun StatisticsScreen(navController: NavController) {
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // 🔥 **Fetch Transactions When Dates Are Selected**
+                // Fetch Transactions When Dates Are Selected
                 LaunchedEffect(selectedYear) {
                     val user = auth.currentUser
                     if (user == null) {
@@ -128,14 +128,14 @@ fun StatisticsScreen(navController: NavController) {
                                 val category = document.getString("category") ?: "Other"
                                 val date = document.getString("date") ?: ""
 
-                                // Extract year from date string (Assumes format: YYYY-MM-DD)
+                                // Extract year from date string
                                 val year = date.split(" ").lastOrNull()?.toIntOrNull()
                                 if (year == selectedYear) {
                                     totals[category] = (totals[category] ?: 0.0) + amount
                                 }
                             }
 
-                            // ✅ **Assign consistent colors to categories**
+                            // Assign consistent colors to categories
                             val sortedCategories = totals.keys.sorted()  // Sort for consistency
                             val colorMap = sortedCategories.mapIndexed { index, category ->
                                 category to colors[index % colors.size]
@@ -166,7 +166,7 @@ fun StatisticsScreen(navController: NavController) {
                     )
                 }
 
-                // 📊 **Chart Section**
+                // Chart Section
                 when (chartType) {
                     "Line Chart" -> LineChartScreen(selectedYear)
                     "Pie Chart" -> PieChartScreen(selectedYear, pieSlices)
@@ -181,7 +181,7 @@ fun StatisticsScreen(navController: NavController) {
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
-            // ✅ Corrected `items` Block
+
             items(categoryTotals.entries.toList()) { entry ->
                 val category = entry.key
                 val total = entry.value
@@ -249,11 +249,11 @@ fun SpendingCategoryCard(category: String, amount: String, color: Color) {
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // 🔴 **Color Dot**
+                // Color Dot
                 Box(
                     modifier = Modifier
                         .size(12.dp)
-                        .background(color, shape = CircleShape) // **Now correctly linked to Pie Chart**
+                        .background(color, shape = CircleShape)
                 )
 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -265,7 +265,7 @@ fun SpendingCategoryCard(category: String, amount: String, color: Color) {
             }
 
             Text(
-                text = "€$amount", // **Formatted amount**
+                text = "€$amount",
                 style = MaterialTheme.typography.body1,
                 color = if (amount.toDoubleOrNull() ?: 0.0 < 0) MaterialTheme.colors.error else Color.Red,
                 fontWeight = FontWeight.Bold
@@ -280,7 +280,7 @@ fun exportToCSV(expenses: Map<String, Double>, context: Context) {
         val currentDate = dateFormat.format(Date())
         val fileName = "Expenses_$currentDate.csv"
 
-        // ✅ Use app-specific Downloads directory
+
         val downloadsDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
         if (downloadsDir?.exists() == false) {
             downloadsDir.mkdirs() // Create the directory if it doesn't exist

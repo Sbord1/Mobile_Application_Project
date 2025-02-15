@@ -1,18 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.example.myapplication"> <!-- Make sure the package name is correct -->
+    package="com.example.myapplication">
     <uses-feature android:name="android.hardware.camera" android:required="true" />
 
-    <!-- Permissions are declared here, directly under the <manifest> tag -->
+
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
 
 
-    <!-- Only use WRITE_EXTERNAL_STORAGE if necessary. Scoped storage is recommended for Android 10+ -->
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
-    <!-- Android 10 and above requires scoped storage. You can declare access to specific storage locations if needed -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
     <application
@@ -41,6 +39,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity android:name="com.canhub.cropper.CropImageActivity"
+            android:theme="@style/Theme.AppCompat"/>
+
+
     </application>
 
 </manifest>

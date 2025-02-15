@@ -51,7 +51,7 @@ fun SignUpScreen(navController: NavController) {
             SignUpBar()
         }
 
-        // Welcome Text Box (slightly above SignUpBar)
+        // Welcome Text Box
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -77,7 +77,7 @@ fun SignUpScreen(navController: NavController) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 380.dp) // Adjusted to make space for the SignUpBar and welcome text
+                .padding(top = 380.dp)
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
@@ -89,7 +89,7 @@ fun SignUpScreen(navController: NavController) {
                 label = { Text("Email") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp) // Adjust padding to control spacing
+                    .padding(vertical = 4.dp)
                     .height(62.dp),
                 singleLine = true,
                 shape = RoundedCornerShape(8.dp),
@@ -108,7 +108,7 @@ fun SignUpScreen(navController: NavController) {
                 label = { Text("Username") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp) // Adjust padding to control spacing
+                    .padding(vertical = 4.dp)
                     .height(62.dp),
                 singleLine = true,
                 shape = RoundedCornerShape(8.dp),
@@ -210,7 +210,7 @@ fun signUpUser(username: String, password: String, email: String, navController:
         .addOnCompleteListener { task ->
             if (task.isSuccessful) {
                 val user = auth.currentUser
-                val userId = user?.uid // Ensure user exists before proceeding
+                val userId = user?.uid
 
                 if (userId != null) {
                     val userData = hashMapOf(
@@ -270,10 +270,10 @@ fun SignUpBar() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(300.dp) // Adjusted height to match layout needs
+            .height(300.dp)
     ) {
         Image(
-            painter = painterResource(id = R.drawable.login), // Replace with your PNG file name
+            painter = painterResource(id = R.drawable.login),
             contentDescription = "Sign Up Bar Background",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop

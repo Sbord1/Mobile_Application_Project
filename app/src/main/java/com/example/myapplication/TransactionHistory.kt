@@ -76,7 +76,7 @@ fun AllTransactionsScreen(navController: NavController) {
             .document(transaction.id)
             .delete()
             .addOnSuccessListener {
-                transaction.isVisible.value = false // ✅ Hide the transaction
+                transaction.isVisible.value = false //  Hide the transaction
                 Toast.makeText(context, "Transaction deleted", Toast.LENGTH_SHORT).show()
             }
             .addOnFailureListener {
@@ -106,22 +106,22 @@ fun AllTransactionsScreen(navController: NavController) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp), // Reduced padding for more space
+                    .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 OutlinedButton(
                     onClick = { showStartDatePicker = true },
                     shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.weight(1f) // Allow flexible resizing
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(
                         text = startDate?.let { formatDate(it) } ?: "Start Date",
-                        maxLines = 1 // Ensure text stays on one line
+                        maxLines = 1
                     )
                 }
 
-                Spacer(modifier = Modifier.width(4.dp)) // Small gap
+                Spacer(modifier = Modifier.width(4.dp))
 
                 OutlinedButton(
                     onClick = { showEndDatePicker = true },
@@ -138,15 +138,15 @@ fun AllTransactionsScreen(navController: NavController) {
                     availableCurrencies.forEach { currency ->
                         DropdownMenuItem(onClick = {
                             expanded = false
-                            isLoading = true// 🌀 Start loading
-                            transactions.clear() // Clear transactions on currency change
+                            isLoading = true
+                            transactions.clear()
 
                             convertAllTransactions(
                                 context,
                                 transactions,
                                 selectedCurrency,
                                 currency,
-                                onStart = { transactions.clear() }, // Clear transactions on start
+                                onStart = { transactions.clear() },
                                 onComplete = {
                                     selectedCurrency = currency
                                     isLoading = false
@@ -177,12 +177,12 @@ fun AllTransactionsScreen(navController: NavController) {
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 🌀 Show Loading Indicator
+            // Show Loading Indicator
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             }
 
-            // 🔄 **Fetch Transactions & Convert on Currency Change**
+            // Fetch Transactions & Convert on Currency Change
             LaunchedEffect(startDate, endDate, selectedCurrency) {
                 val user = auth.currentUser
                 if (user == null) {
@@ -251,7 +251,7 @@ fun AllTransactionsScreen(navController: NavController) {
                         FullTransactionItem(
                             transaction = transaction,
                             selectedCurrency = selectedCurrency,
-                            onDelete = { deleteTransaction(it) } // ✅ Pass delete callback
+                            onDelete = { deleteTransaction(it) }
                         )
                     }
                 }
@@ -268,13 +268,13 @@ fun AllTransactionsScreen(navController: NavController) {
 fun FullTransactionItem(
     transaction: Transaction,
     selectedCurrency: String,
-    onDelete: (Transaction) -> Unit // ✅ Callback for deleting
+    onDelete: (Transaction) -> Unit //  Callback for deleting
 ) {
 
     val dismissState = rememberDismissState(
         confirmStateChange = {
             if (it == DismissValue.DismissedToEnd || it == DismissValue.DismissedToStart) {
-                onDelete(transaction) // ✅ Trigger delete callback
+                onDelete(transaction) //  Trigger delete callback
                 true
             } else {
                 false
@@ -289,7 +289,7 @@ fun FullTransactionItem(
     ) {
         SwipeToDismiss(
             state = dismissState,
-            directions = setOf(DismissDirection.EndToStart), // ✅ Swipe Left
+            directions = setOf(DismissDirection.EndToStart), //Swipe Left
             background = {
                 Box(
                     modifier = Modifier
@@ -342,10 +342,10 @@ fun FullTransactionItem(
 
 fun convertAllTransactions(
     context: Context,
-    transactions: MutableList<Transaction>,  // Changed to MutableList
+    transactions: MutableList<Transaction>,
     fromCurrency: String,
     toCurrency: String,
-    onStart: () -> Unit,  // Added to trigger UI changes when loading starts
+    onStart: () -> Unit,
     onComplete: () -> Unit
 ) {
     if (fromCurrency == toCurrency) {

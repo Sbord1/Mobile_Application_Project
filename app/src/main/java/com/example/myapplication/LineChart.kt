@@ -70,7 +70,7 @@ fun LineChartScreen(selectedYear: Int) {
     val steps = if (maxY > 0) ((maxY - minY) / yStepSize).toInt() else 5
 
     val xAxisData = AxisData.Builder()
-        .axisStepSize(35.dp) // Tighter spacing between months
+        .axisStepSize(35.dp)
         .backgroundColor(Color.Transparent)
         .steps(11)
         .labelData { i -> monthLabels.getOrNull(i.toInt()) ?: "" }
@@ -86,7 +86,7 @@ fun LineChartScreen(selectedYear: Int) {
         .axisLabelColor(MaterialTheme.colorScheme.primary)
         .build()
 
-    // ✅ No external scroll modifier, scroll handled inside LineChart
+
     Box(modifier = Modifier.fillMaxWidth()) {
         if (chartData.isNotEmpty()) {
             LineChart(
@@ -118,7 +118,7 @@ fun LineChartScreen(selectedYear: Int) {
                     backgroundColor = Color.Transparent,
                     xAxisData = xAxisData,
                     yAxisData = yAxisData,
-                    isZoomAllowed = true, // ✅ Enable pinch-to-zoom and scroll gestures
+                    isZoomAllowed = true, //  Enable pinch-to-zoom and scroll gestures
                     paddingRight = 0.dp,
                     containerPaddingEnd = 0.dp
                 )

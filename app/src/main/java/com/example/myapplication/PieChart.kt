@@ -20,7 +20,7 @@ fun PieChartScreen(selectedYear: Int, pieSlices: List<PieChartData.Slice>) {
 
     LaunchedEffect(selectedYear) {
         showChart = false        // Hide the chart temporarily
-        delay(150)                // Short delay to clear previous chart (adjust if needed)
+        delay(150)                // Short delay to clear previous chart
         showChart = true         // Show new chart with animation
     }
 
